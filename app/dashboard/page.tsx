@@ -14,33 +14,50 @@ type Bookmark = {
     created_at: string
     user_id: string
 }
+
 const supabase = createClient()
+
 export default function DashboardPage() {
     const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
     const [loading, setLoading] = useState(true)
+    const [user, setUser] = useState<any>(null)
     const [userEmail, setUserEmail] = useState('')
     const [realtimeConnected, setRealtimeConnected] = useState(false)
+
     const router = useRouter()
 
-
+    // -----------------------------
+    // 1️⃣ AUTH CHECK
+    // -----------------------------
     useEffect(() => {
-        // Check authentication
-        const checkUser = async () => {
+        const initUser = async () => {
             const { data: { user } } = await supabase.auth.getUser()
+
             console.log("PRODUCTION USER:", user)
+
             if (!user) {
                 router.push('/login')
                 return
             }
+
+            setUser(user)
             setUserEmail(user.email || '')
         }
-        checkUser()
 
-        // Initial fetch
+        initUser()
+    }, [router])
+
+    // -----------------------------
+    // 2️⃣ FETCH BOOKMARKS
+    // -----------------------------
+    useEffect(() => {
+        if (!user) return
+
         const fetchBookmarks = async () => {
             const { data, error } = await supabase
                 .from('bookmarks')
                 .select('*')
+                .eq('user_id', user.id)
                 .order('created_at', { ascending: false })
 
             if (error) {
@@ -48,11 +65,19 @@ export default function DashboardPage() {
             } else {
                 setBookmarks(data || [])
             }
+
             setLoading(false)
         }
-        fetchBookmarks()
 
-        // Realtime subscription
+        fetchBookmarks()
+    }, [user])
+
+    // -----------------------------
+    // 3️⃣ REALTIME SUBSCRIPTION
+    // -----------------------------
+    useEffect(() => {
+        if (!user) return
+
         const channel = supabase
             .channel('bookmarks-realtime')
             .on(
@@ -61,76 +86,62 @@ export default function DashboardPage() {
                     event: '*',
                     schema: 'public',
                     table: 'bookmarks',
+                    filter: `user_id=eq.${user.id}`, // 🔥 critical
                 },
                 (payload) => {
-                    console.log('🔥 Realtime event:', payload.eventType, payload)
+                    console.log('🔥 Realtime event:', payload.eventType)
+
                     if (payload.eventType === 'INSERT') {
-                        console.log('📥 INSERT event received for bookmark:', payload.new.id)
-                        setBookmarks((prev) => {
-                            // Check if bookmark already exists (avoid duplicates from optimistic updates)
-                            const exists = prev.some(b => b.id === payload.new.id)
-                            console.log('Current bookmark IDs:', prev.map(b => b.id))
-                            console.log('New bookmark ID:', payload.new.id)
-                            console.log('Exists?', exists)
-                            if (exists) {
-                                console.log('⚠️ Bookmark already exists (from optimistic update), skipping Realtime INSERT')
-                                return prev
-                            }
-                            console.log('✅ Adding bookmark from Realtime INSERT')
+                        setBookmarks(prev => {
+                            if (prev.some(b => b.id === payload.new.id)) return prev
                             return [payload.new as Bookmark, ...prev]
                         })
-                    } else if (payload.eventType === 'DELETE') {
-                        console.log('🗑️ Deleting bookmark:', payload.old.id)
-                        setBookmarks((prev) =>
-                            prev.filter((b) => b.id !== payload.old.id)
+                    }
+
+                    if (payload.eventType === 'DELETE') {
+                        setBookmarks(prev =>
+                            prev.filter(b => b.id !== payload.old.id)
                         )
-                    } else if (payload.eventType === 'UPDATE') {
-                        setBookmarks((prev) =>
-                            prev.map((b) => (b.id === payload.new.id ? payload.new as Bookmark : b))
+                    }
+
+                    if (payload.eventType === 'UPDATE') {
+                        setBookmarks(prev =>
+                            prev.map(b =>
+                                b.id === payload.new.id
+                                    ? payload.new as Bookmark
+                                    : b
+                            )
                         )
                     }
                 }
             )
-            .subscribe((status, err) => {
-                console.log('📡 Realtime subscription status:', status)
-                if (err) {
-                    console.error('❌ Realtime subscription error:', err)
-                }
-                if (status === 'SUBSCRIBED') {
-                    console.log('✅ Successfully subscribed to bookmarks Realtime')
-                    setRealtimeConnected(true)
-                } else if (status === 'CHANNEL_ERROR') {
-                    console.error('❌ Channel error - check Realtime settings')
-                    setRealtimeConnected(false)
-                } else if (status === 'TIMED_OUT') {
-                    console.error('❌ Subscription timed out')
-                    setRealtimeConnected(false)
-                } else if (status === 'CLOSED') {
-                    console.warn('⚠️ Channel closed')
-                    setRealtimeConnected(false)
-                }
+            .subscribe((status) => {
+                console.log('📡 Realtime status:', status)
+                setRealtimeConnected(status === 'SUBSCRIBED')
             })
 
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [router])
+    }, [user])
 
+    // -----------------------------
+    // OPTIMISTIC ADD
+    // -----------------------------
     const handleBookmarkAdded = (newBookmark: Bookmark) => {
-        console.log('➕ Optimistically adding bookmark:', newBookmark.id)
-        setBookmarks((prev) => {
-            // Check if it already exists (avoid duplicates from Realtime)
-            if (prev.some(b => b.id === newBookmark.id)) {
-                console.log('⚠️ Bookmark already exists, skipping')
-                return prev
-            }
+        setBookmarks(prev => {
+            if (prev.some(b => b.id === newBookmark.id)) return prev
             return [newBookmark, ...prev]
         })
     }
 
+    // -----------------------------
+    // OPTIMISTIC DELETE
+    // -----------------------------
     const handleBookmarkDeleted = (id: string) => {
-        console.log('🗑️ Optimistically deleting bookmark:', id)
-        setBookmarks((prev) => prev.filter(b => b.id !== id))
+        setBookmarks(prev =>
+            prev.filter(b => b.id !== id)
+        )
     }
 
     return (
@@ -138,7 +149,6 @@ export default function DashboardPage() {
             {userEmail && <Navbar userEmail={userEmail} />}
 
             <div className="max-w-7xl mx-auto px-6 py-8">
-                {/* Add Bookmark Section */}
                 <div className="mb-8">
                     <AddBookmarkForm onBookmarkAdded={handleBookmarkAdded} />
                 </div>
@@ -148,10 +158,19 @@ export default function DashboardPage() {
                         Your Bookmarks {!loading && `(${bookmarks.length})`}
                     </h2>
 
-                    {/* Realtime Connection Status */}
                     <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${realtimeConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-                        <span className={`text-sm ${realtimeConnected ? 'text-green-400' : 'text-red-400'}`}>
+                        <div
+                            className={`w-2 h-2 rounded-full ${realtimeConnected
+                                    ? 'bg-green-500 animate-pulse'
+                                    : 'bg-red-500'
+                                }`}
+                        ></div>
+                        <span
+                            className={`text-sm ${realtimeConnected
+                                    ? 'text-green-400'
+                                    : 'text-red-400'
+                                }`}
+                        >
                             {realtimeConnected ? 'Live' : 'Disconnected'}
                         </span>
                     </div>
@@ -159,13 +178,16 @@ export default function DashboardPage() {
 
                 {loading ? (
                     <div className="text-center py-12">
-                        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent"></div>
-                        <p className="text-gray-400 mt-4">Loading bookmarks...</p>
+                        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-r-transparent"></div>
+                        <p className="text-gray-400 mt-4">
+                            Loading bookmarks...
+                        </p>
                     </div>
                 ) : bookmarks.length === 0 ? (
                     <div className="text-center py-12 bg-gray-900 rounded-xl border border-gray-800">
-                        <p className="text-gray-400 text-lg">No bookmarks yet!</p>
-                        <p className="text-gray-500 text-sm mt-2">Add your first bookmark above to get started.</p>
+                        <p className="text-gray-400 text-lg">
+                            No bookmarks yet!
+                        </p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
