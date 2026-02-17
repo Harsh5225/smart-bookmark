@@ -10,7 +10,13 @@ type Bookmark = {
     created_at: string
 }
 
-export default function BookmarkCard({ bookmark }: { bookmark: Bookmark }) {
+export default function BookmarkCard({
+    bookmark,
+    onDelete
+}: {
+    bookmark: Bookmark
+    onDelete?: (id: string) => void
+}) {
     const [deleting, setDeleting] = useState(false)
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const [copied, setCopied] = useState(false)
@@ -56,8 +62,12 @@ export default function BookmarkCard({ bookmark }: { bookmark: Bookmark }) {
             setDeleting(false)
         } else {
             showToast('Bookmark deleted successfully', 'success')
+            // Optimistically remove from UI
+            if (onDelete) {
+                onDelete(bookmark.id)
+            }
         }
-        // No need to update state - Realtime will handle it
+        // Realtime will also handle it (duplicate prevention in parent)
     }
 
     const handleCopyUrl = async () => {

@@ -61,6 +61,7 @@ export default function DashboardPage() {
                     table: 'bookmarks',
                 },
                 (payload) => {
+                    console.log('🔥 Realtime event:', payload.eventType, payload)
                     if (payload.eventType === 'INSERT') {
                         setBookmarks((prev) => {
                             // Check if bookmark already exists (avoid duplicates from optimistic updates)
@@ -70,6 +71,7 @@ export default function DashboardPage() {
                             return [payload.new as Bookmark, ...prev]
                         })
                     } else if (payload.eventType === 'DELETE') {
+                        console.log('🗑️ Deleting bookmark:', payload.old.id)
                         setBookmarks((prev) =>
                             prev.filter((b) => b.id !== payload.old.id)
                         )
@@ -95,6 +97,11 @@ export default function DashboardPage() {
             }
             return [newBookmark, ...prev]
         })
+    }
+
+    const handleBookmarkDeleted = (id: string) => {
+        console.log('🗑️ Optimistically deleting bookmark:', id)
+        setBookmarks((prev) => prev.filter(b => b.id !== id))
     }
 
     return (
@@ -126,7 +133,11 @@ export default function DashboardPage() {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {bookmarks.map((bookmark) => (
-                            <BookmarkCard key={bookmark.id} bookmark={bookmark} />
+                            <BookmarkCard
+                                key={bookmark.id}
+                                bookmark={bookmark}
+                                onDelete={handleBookmarkDeleted}
+                            />
                         ))}
                     </div>
                 )}
