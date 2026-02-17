@@ -9,7 +9,7 @@ type Bookmark = {
     title: string
     created_at: string
 }
-
+ const supabase = createClient()
 export default function BookmarkCard({
     bookmark,
     onDelete
@@ -22,7 +22,7 @@ export default function BookmarkCard({
     const [copied, setCopied] = useState(false)
     const [favicon, setFavicon] = useState('')
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
-    const supabase = createClient()
+   
 
     // Extract domain for favicon
     useEffect(() => {

@@ -10,14 +10,14 @@ type Bookmark = {
     created_at: string
     user_id: string
 }
-
+const supabase = createClient()
 export default function AddBookmarkForm({ onBookmarkAdded }: { onBookmarkAdded?: (bookmark: Bookmark) => void }) {
     const [url, setUrl] = useState('')
     const [title, setTitle] = useState('')
     const [loading, setLoading] = useState(false)
     const [showToast, setShowToast] = useState(false)
     const [favicon, setFavicon] = useState('')
-    const supabase = createClient()
+
 
     // Extract domain for favicon
     useEffect(() => {
