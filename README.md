@@ -15,7 +15,7 @@ A modern, real-time bookmark manager built with Next.js 14, Supabase, and Tailwi
 
 | Technology | Purpose |
 |-----------|---------|
-| **Next.js 14** (App Router) | React framework with SSR and file-based routing |
+| **Next.js 16** (App Router) | React framework with SSR and file-based routing |
 | **Supabase** | Backend-as-a-Service (Auth, PostgreSQL, Realtime) |
 | **Tailwind CSS** | Utility-first CSS framework |
 | **TypeScript** | Type-safe development |
