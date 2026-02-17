@@ -82,7 +82,21 @@ export default function DashboardPage() {
                     }
                 }
             )
-            .subscribe()
+            .subscribe((status, err) => {
+                console.log('📡 Realtime subscription status:', status)
+                if (err) {
+                    console.error('❌ Realtime subscription error:', err)
+                }
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ Successfully subscribed to bookmarks Realtime')
+                } else if (status === 'CHANNEL_ERROR') {
+                    console.error('❌ Channel error - check Realtime settings')
+                } else if (status === 'TIMED_OUT') {
+                    console.error('❌ Subscription timed out')
+                } else if (status === 'CLOSED') {
+                    console.warn('⚠️ Channel closed')
+                }
+            })
 
         return () => {
             supabase.removeChannel(channel)
@@ -90,9 +104,11 @@ export default function DashboardPage() {
     }, [supabase, router])
 
     const handleBookmarkAdded = (newBookmark: Bookmark) => {
+        console.log('➕ Optimistically adding bookmark:', newBookmark.id)
         setBookmarks((prev) => {
             // Check if it already exists (avoid duplicates from Realtime)
             if (prev.some(b => b.id === newBookmark.id)) {
+                console.log('⚠️ Bookmark already exists, skipping')
                 return prev
             }
             return [newBookmark, ...prev]
