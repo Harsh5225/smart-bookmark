@@ -27,6 +27,7 @@ export default function DashboardPage() {
         // Check authentication
         const checkUser = async () => {
             const { data: { user } } = await supabase.auth.getUser()
+            console.log("PRODUCTION USER:", user)
             if (!user) {
                 router.push('/login')
                 return
