@@ -2,10 +2,10 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+const supabase = createClient()
 
 export default function Navbar({ userEmail }: { userEmail: string }) {
     const router = useRouter()
-    const supabase = createClient()
 
     const handleLogout = async () => {
         await supabase.auth.signOut()
